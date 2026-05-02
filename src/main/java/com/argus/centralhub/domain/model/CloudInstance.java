@@ -1,6 +1,7 @@
 package com.argus.centralhub.domain.model;
 
 import com.argus.centralhub.common.BaseEntity;
+import com.argus.centralhub.converter.JsonMapConverter;
 import com.argus.centralhub.domain.enums.CloudProvider;
 import com.argus.centralhub.domain.enums.InstanceStatus;
 import com.argus.centralhub.exception.BusinessException;
@@ -8,6 +9,9 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Entity
 @Table(name = "cloud_instance", indexes = {
@@ -57,6 +61,10 @@ public class CloudInstance extends BaseEntity {
     @Column(length = 128)
     private String projectId;
 
+    @Convert(converter = JsonMapConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private Map<String, String> tags = new HashMap<>();
+
     // --- 工厂方法 ---
 
     public static CloudInstance create(String instanceId, CloudProvider provider,
@@ -92,6 +100,13 @@ public class CloudInstance extends BaseEntity {
         this.status = InstanceStatus.STOPPED;
     }
 
+    public void restart() {
+        if (this.status == InstanceStatus.TERMINATED) {
+            throw new BusinessException("已销毁的实例无法重启");
+        }
+        this.status = InstanceStatus.RESTARTING;
+    }
+
     public void terminate() {
         if (this.status == InstanceStatus.TERMINATED) {
             throw new BusinessException("实例已销毁");
@@ -101,5 +116,31 @@ public class CloudInstance extends BaseEntity {
 
     public void rename(String newName) {
         this.instanceName = newName;
+    }
+
+    public void updateTags(Map<String, String> newTags) {
+        if (newTags != null) {
+            this.tags = new HashMap<>(newTags);
+        }
+    }
+
+    public void putTag(String key, String value) {
+        this.tags.put(key, value);
+    }
+
+    public void removeTag(String key) {
+        this.tags.remove(key);
+    }
+
+    public String getTag(String key) {
+        return this.tags.get(key);
+    }
+
+    public boolean hasTag(String key) {
+        return this.tags.containsKey(key);
+    }
+
+    public boolean hasTagWithValue(String key, String value) {
+        return this.tags.containsKey(key) && value.equals(this.tags.get(key));
     }
 }

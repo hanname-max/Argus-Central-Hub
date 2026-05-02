@@ -43,6 +43,20 @@ spring:
           max-idle: 8
           min-idle: 0
 
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: ${MAIL_PROTOCOL:smtp}
+    default-encoding: UTF-8
+    to: ${MAIL_TO:}
+    smtp:
+      auth: true
+      start-tls-enable: true
+      ssl-enable: false
+      ssl-trust: ${MAIL_HOST:smtp.qq.com}
+
 logging:
   level:
     com.argus.centralhub: ${LOG_LEVEL:DEBUG}
@@ -77,3 +91,75 @@ rate-limit:
     window-seconds: 60
   max-wait-retries: 3
   retry-interval-ms: 500
+
+scheduler:
+  instance-sync:
+    enabled: ${INSTANCE_SYNC_ENABLED:true}
+    cron: ${INSTANCE_SYNC_CRON:0 */5 * * * ?}
+    default-region: ${INSTANCE_SYNC_DEFAULT_REGION:cn-east-1}
+    regions:
+      ALIYUN:
+        - cn-hangzhou
+        - cn-beijing
+        - cn-shanghai
+      AWS:
+        - cn-north-1
+        - cn-northwest-1
+      TENCENT:
+        - ap-guangzhou
+        - ap-shanghai
+      HUAWEI:
+        - cn-south-1
+        - cn-east-3
+      AZURE:
+        - chinaeast
+        - chinanorth
+      GOOGLE_CLOUD:
+        - asia-east1
+        - asia-southeast1
+      VOLCENGINE:
+        - cn-beijing
+        - cn-shanghai
+      JD_CLOUD:
+        - cn-north-1
+        - cn-east-2
+      ORACLE:
+        - ap-chuncheon-1
+        - ap-seoul-1
+
+shutdown-rule:
+  enabled: ${SHUTDOWN_RULE_ENABLED:false}
+  cron: ${SHUTDOWN_RULE_CRON:0 0 * * * ?}
+  time-window:
+    start-hour: ${SHUTDOWN_RULE_START_HOUR:1}
+    end-hour: ${SHUTDOWN_RULE_END_HOUR:6}
+  tag-rules:
+    - key: env
+      value: dev
+
+feishu:
+  bot:
+    app-id: ${FEISHU_APP_ID:}
+    app-secret: ${FEISHU_APP_SECRET:}
+    verification-token: ${FEISHU_VERIFICATION_TOKEN:}
+    encrypt-key: ${FEISHU_ENCRYPT_KEY:}
+    tenant-key: ${FEISHU_TENANT_KEY:}
+    allowed-operator-ids: ${FEISHU_ALLOWED_OPERATOR_IDS:}
+    alert-receiver-open-id: ${FEISHU_ALERT_RECEIVER_OPEN_ID:}
+    alert-receiver-chat-id: ${FEISHU_ALERT_RECEIVER_CHAT_ID:}
+
+llm:
+  enabled: ${LLM_ENABLED:false}
+  api-key: ${LLM_API_KEY:}
+  api-endpoint: ${LLM_API_ENDPOINT:https://api.deepseek.com/v1}
+  model: ${LLM_MODEL:deepseek-chat}
+  temperature: ${LLM_TEMPERATURE:0.7}
+  max-tokens: ${LLM_MAX_TOKENS:2048}
+  timeout:
+    connect-ms: ${LLM_TIMEOUT_CONNECT_MS:10000}
+    read-ms: ${LLM_TIMEOUT_READ_MS:60000}
+  retry:
+    max-attempts: ${LLM_RETRY_MAX_ATTEMPTS:3}
+    initial-delay-ms: ${LLM_RETRY_INITIAL_DELAY_MS:1000}
+    multiplier: ${LLM_RETRY_MULTIPLIER:2.0}
+    max-delay-ms: ${LLM_RETRY_MAX_DELAY_MS:10000}
