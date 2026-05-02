@@ -47,3 +47,14 @@ logging:
   level:
     com.argus.centralhub: ${LOG_LEVEL:DEBUG}
     org.hibernate.SQL: ${HIBERNATE_LOG_LEVEL:DEBUG}
+
+cloud:
+  provider:
+    third-party:
+      - code: ${THIRD_PARTY_CLOUD_CODE:CUSTOM_CLOUD}
+        label: ${THIRD_PARTY_CLOUD_LABEL:自定义云厂商}
+        api-endpoint: ${THIRD_PARTY_CLOUD_API_ENDPOINT:https://api.custom-cloud.com}
+        auth-type: ${THIRD_PARTY_CLOUD_AUTH_TYPE:API_KEY}
+        access-key: ${THIRD_PARTY_CLOUD_ACCESS_KEY:}
+        secret-key: ${THIRD_PARTY_CLOUD_SECRET_KEY:}
+        region: ${THIRD_PARTY_CLOUD_REGION:cn-east-1}

@@ -1,10 +1,5 @@
 package com.argus.centralhub.common;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
-@Getter
-@AllArgsConstructor
 public enum ResultCode {
     
     SUCCESS(200, "操作成功"),
@@ -17,4 +12,17 @@ public enum ResultCode {
     
     private final int code;
     private final String message;
+
+    ResultCode(int code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    public int getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
 }

@@ -2,7 +2,8 @@ package com.argus.centralhub.exception;
 
 import com.argus.centralhub.common.ResultCode;
 import com.argus.centralhub.common.ResultData;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -18,9 +19,10 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.stream.Collectors;
 
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     
     @ExceptionHandler(BusinessException.class)
     public ResultData<Void> handleBusinessException(BusinessException e) {
