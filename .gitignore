@@ -1,0 +1,58 @@
+# ============================================
+# Argus Central Hub - Git Ignore 文件
+# ============================================
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 编译输出
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE 配置
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+.metadata/
+*.swp
+*.swo
+*~
+
+# 日志文件
+logs/
+*.log
+*.tmp
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# 测试覆盖率
+jacoco.exec
+
+# Spring Boot
+*.pid
