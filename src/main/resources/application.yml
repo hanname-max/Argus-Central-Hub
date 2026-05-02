@@ -58,3 +58,22 @@ cloud:
         access-key: ${THIRD_PARTY_CLOUD_ACCESS_KEY:}
         secret-key: ${THIRD_PARTY_CLOUD_SECRET_KEY:}
         region: ${THIRD_PARTY_CLOUD_REGION:cn-east-1}
+
+cache:
+  ttl-minutes: 3
+  local-cache:
+    enabled: true
+  distributed:
+    enabled: true
+
+rate-limit:
+  local:
+    enabled: true
+    limit: 100
+    window-seconds: 60
+  distributed:
+    enabled: true
+    limit: 500
+    window-seconds: 60
+  max-wait-retries: 3
+  retry-interval-ms: 500

@@ -10,6 +10,7 @@ public enum CloudProvider {
     GOOGLE_CLOUD("GOOGLE_CLOUD", "谷歌云"),
     VOLCENGINE("VOLCENGINE", "火山引擎"),
     JD_CLOUD("JD_CLOUD", "京东云"),
+    ORACLE("ORACLE", "Oracle云"),
     OTHER("OTHER", "第三方/其他");
 
     private final String code;
