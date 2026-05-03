@@ -69,13 +69,19 @@ public class CloudInstance extends BaseEntity {
 
     public static CloudInstance create(String instanceId, CloudProvider provider,
                                        String region, String zone, String instanceType) {
+        return create(instanceId, provider, region, zone, instanceType, InstanceStatus.PENDING);
+    }
+
+    public static CloudInstance create(String instanceId, CloudProvider provider,
+                                       String region, String zone, String instanceType,
+                                       InstanceStatus initialStatus) {
         CloudInstance instance = new CloudInstance();
         instance.instanceId = instanceId;
         instance.cloudProvider = provider;
         instance.region = region;
         instance.zone = zone;
         instance.instanceType = instanceType;
-        instance.status = InstanceStatus.PENDING;
+        instance.status = initialStatus;
         return instance;
     }
 

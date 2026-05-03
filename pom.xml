@@ -78,6 +78,28 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
         
+        <!-- Resilience4j -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-timelimiter</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        
         <!-- ShedLock for distributed scheduled tasks -->
         <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
@@ -95,6 +117,18 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+        
+        <!-- Docker Java -->
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java</artifactId>
+            <version>3.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-transport-okhttp</artifactId>
+            <version>3.4.0</version>
         </dependency>
         
         <!-- Test -->
@@ -117,6 +151,9 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                    <layers>
+                        <enabled>true</enabled>
+                    </layers>
                 </configuration>
             </plugin>
         </plugins>

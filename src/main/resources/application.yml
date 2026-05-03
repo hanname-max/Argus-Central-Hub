@@ -163,3 +163,100 @@ llm:
     initial-delay-ms: ${LLM_RETRY_INITIAL_DELAY_MS:1000}
     multiplier: ${LLM_RETRY_MULTIPLIER:2.0}
     max-delay-ms: ${LLM_RETRY_MAX_DELAY_MS:10000}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: ${RESILIENCE4J_FAILURE_RATE_THRESHOLD:50}
+        slow-call-rate-threshold: ${RESILIENCE4J_SLOW_CALL_RATE_THRESHOLD:100}
+        slow-call-duration-threshold: ${RESILIENCE4J_SLOW_CALL_DURATION_THRESHOLD:5s}
+        wait-duration-in-open-state: ${RESILIENCE4J_WAIT_DURATION_IN_OPEN_STATE:30s}
+        permitted-number-of-calls-in-half-open-state: ${RESILIENCE4J_PERMITTED_CALLS_IN_HALF_OPEN:3}
+        sliding-window-size: ${RESILIENCE4J_SLIDING_WINDOW_SIZE:10}
+        minimum-number-of-calls: ${RESILIENCE4J_MINIMUM_CALLS:5}
+        sliding-window-type: COUNT_BASED
+        automatic-transition-from-open-to-half-open: true
+        record-exceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - java.io.IOException
+          - org.springframework.web.client.ResourceAccessException
+    instances:
+      cloud-api:
+        base-config: default
+        failure-rate-threshold: 40
+        wait-duration-in-open-state: 20s
+      docker-api:
+        base-config: default
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 15s
+        slow-call-duration-threshold: 10s
+      feishu-api:
+        base-config: default
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+      llm-api:
+        base-config: default
+        failure-rate-threshold: 30
+        wait-duration-in-open-state: 60s
+        slow-call-duration-threshold: 30s
+
+  retry:
+    configs:
+      default:
+        max-attempts: ${RESILIENCE4J_RETRY_MAX_ATTEMPTS:3}
+        wait-duration: ${RESILIENCE4J_RETRY_WAIT_DURATION:1s}
+        retry-exceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - java.io.IOException
+          - org.springframework.web.client.ResourceAccessException
+    instances:
+      cloud-api:
+        max-attempts: 3
+        wait-duration: 500ms
+      docker-api:
+        max-attempts: 2
+        wait-duration: 1s
+      feishu-api:
+        max-attempts: 2
+        wait-duration: 2s
+      llm-api:
+        max-attempts: 3
+        wait-duration: 1s
+
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: ${RESILIENCE4J_TIMEOUT_DURATION:30s}
+        cancel-running-future: true
+    instances:
+      cloud-api:
+        timeout-duration: 15s
+      docker-api:
+        timeout-duration: 30s
+      feishu-api:
+        timeout-duration: 10s
+      llm-api:
+        timeout-duration: 60s
+
+webhook:
+  enabled: ${WEBHOOK_ENABLED:true}
+  secret: ${WEBHOOK_SECRET:your-secret-key-here}
+  signature-header: ${WEBHOOK_SIGNATURE_HEADER:X-Hub-Signature-256}
+  signature-prefix: ${WEBHOOK_SIGNATURE_PREFIX:sha256=}
+  allowed-ips: ${WEBHOOK_ALLOWED_IPS:}
+  max-payload-size: ${WEBHOOK_MAX_PAYLOAD_SIZE:102400}
+  registry-auths:
+    - image-prefix: ${WEBHOOK_REGISTRY1_PREFIX:}
+      username: ${WEBHOOK_REGISTRY1_USERNAME:}
+      password: ${WEBHOOK_REGISTRY1_PASSWORD:}
+
+docker:
+  nodes:
+    - name: ${DOCKER_NODE1_NAME:node1}
+      host: ${DOCKER_NODE1_HOST:localhost}
+      port: ${DOCKER_NODE1_PORT:2375}
+      tls-enabled: ${DOCKER_NODE1_TLS_ENABLED:false}
+      cert-path: ${DOCKER_NODE1_CERT_PATH:}

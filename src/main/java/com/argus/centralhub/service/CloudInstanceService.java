@@ -1,12 +1,12 @@
 package com.argus.centralhub.service;
 
 import com.argus.centralhub.cache.InstanceCacheService;
-import com.argus.centralhub.circuitbreaker.CircuitBreakerService;
 import com.argus.centralhub.domain.enums.CloudProvider;
 import com.argus.centralhub.domain.model.CloudInstance;
 import com.argus.centralhub.ratelimit.RateLimiterService;
 import com.argus.centralhub.strategy.CloudProviderStrategy;
 import com.argus.centralhub.strategy.CloudProviderStrategyFactory;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,18 +29,18 @@ public class CloudInstanceService {
     private final CloudProviderStrategyFactory strategyFactory;
     private final RateLimiterService rateLimiterService;
     private final InstanceCacheService instanceCacheService;
-    private final CircuitBreakerService circuitBreakerService;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final ExecutorService virtualThreadExecutor;
 
     public CloudInstanceService(
             CloudProviderStrategyFactory strategyFactory,
             RateLimiterService rateLimiterService,
             InstanceCacheService instanceCacheService,
-            CircuitBreakerService circuitBreakerService) {
+            CircuitBreakerRegistry circuitBreakerRegistry) {
         this.strategyFactory = strategyFactory;
         this.rateLimiterService = rateLimiterService;
         this.instanceCacheService = instanceCacheService;
-        this.circuitBreakerService = circuitBreakerService;
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
@@ -96,32 +96,20 @@ public class CloudInstanceService {
                 continue;
             }
 
-            if (!circuitBreakerService.allowRequest(provider, operation)) {
-                log.warn("熔断器打开，跳过调用: {} - 使用降级策略", provider.getLabel());
-                continue;
-            }
-
             Future<List<CloudInstance>> future = virtualThreadExecutor.submit(() -> {
-                try {
-                    if (!rateLimiterService.tryAcquire(provider, operation)) {
-                        log.warn("API 限流，跳过调用: {}", provider.getLabel());
-                        return Collections.emptyList();
-                    }
-
-                    log.info("开始调用 {} 的实例列表 API", provider.getLabel());
-                    List<CloudInstance> instances = strategy.listInstances(region);
-                    log.info("{} 调用成功，获取到 {} 个实例",
-                            provider.getLabel(), instances.size());
-
-                    instanceCacheService.putToCache(provider, region, instances);
-                    circuitBreakerService.recordSuccess(provider, operation);
-
-                    return instances;
-                } catch (Exception e) {
-                    log.error("{} 调用失败: {}", provider.getLabel(), e.getMessage());
-                    circuitBreakerService.recordFailure(provider, operation);
-                    throw e;
+                if (!rateLimiterService.tryAcquire(provider, operation)) {
+                    log.warn("API 限流，跳过调用: {}", provider.getLabel());
+                    return Collections.emptyList();
                 }
+
+                log.info("开始调用 {} 的实例列表 API", provider.getLabel());
+                List<CloudInstance> instances = strategy.listInstances(region);
+                log.info("{} 调用成功，获取到 {} 个实例",
+                        provider.getLabel(), instances.size());
+
+                instanceCacheService.putToCache(provider, region, instances);
+
+                return instances;
             });
             futures.add(future);
         }
@@ -174,12 +162,8 @@ public class CloudInstanceService {
         }
     }
 
-    public void resetCircuitBreaker(String providerCode, String operation) {
-        try {
-            CloudProvider.fromCode(providerCode);
-            circuitBreakerService.getCircuitBreaker(providerCode + ":" + operation);
-        } catch (IllegalArgumentException e) {
-            log.warn("无效的云服务商代码: {}", providerCode);
-        }
+    public void resetCircuitBreaker(String name) {
+        circuitBreakerRegistry.circuitBreaker(name).reset();
+        log.info("断路器 [{}] 已重置", name);
     }
 }

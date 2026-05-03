@@ -1,5 +1,6 @@
 package com.argus.centralhub.llm;
 
+import com.argus.centralhub.circuitbreaker.annotation.CircuitBreakerProtect;
 import com.argus.centralhub.llm.LlmException.LlmErrorType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,22 +25,22 @@ public class LlmService {
     private final LlmProperties properties;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final ExponentialBackoffRetryStrategy retryStrategy;
 
-    public LlmService(LlmProperties properties, 
-                      @Qualifier("llmRestTemplate") RestTemplate restTemplate, 
+    public LlmService(LlmProperties properties,
+                      @Qualifier("llmRestTemplate") RestTemplate restTemplate,
                       ObjectMapper objectMapper) {
         this.properties = properties;
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
-        this.retryStrategy = ExponentialBackoffRetryStrategy.builder()
-                .maxAttempts(properties.getRetry().getMaxAttempts())
-                .initialDelayMs(properties.getRetry().getInitialDelayMs())
-                .multiplier(properties.getRetry().getMultiplier())
-                .maxDelayMs(properties.getRetry().getMaxDelayMs())
-                .build();
     }
 
+    @CircuitBreakerProtect(
+            name = "llm-api-analyzeLog",
+            timeoutMs = 60000,
+            maxRetries = 0,
+            enableRetry = false,
+            fallbackMethod = "analyzeLogFallback"
+    )
     public String analyzeLog(String systemPrompt, String logContent) {
         if (!properties.isEnabled()) {
             log.warn("LLM 服务未启用，请配置 llm.enabled=true");
@@ -60,46 +61,41 @@ public class LlmService {
         messages.add(new ChatMessage("system", systemPrompt));
         messages.add(new ChatMessage("user", logContent));
 
-        return chatCompletionWithRetry(messages);
+        return doChatCompletion(messages);
     }
 
+    private String analyzeLogFallback(String systemPrompt, String logContent, Throwable cause) {
+        log.warn("LLM API analyzeLog 断路器触发。原因: {}", cause.getMessage());
+        throw new LlmException(
+                LlmErrorType.SERVICE_UNAVAILABLE,
+                "LLM 服务暂时不可用，请稍后重试",
+                cause
+        );
+    }
+
+    @CircuitBreakerProtect(
+            name = "llm-api-chatCompletion",
+            timeoutMs = 60000,
+            maxRetries = 0,
+            enableRetry = false,
+            fallbackMethod = "chatCompletionFallback"
+    )
     public String chatCompletion(List<ChatMessage> messages) {
         if (!properties.isEnabled()) {
             log.warn("LLM 服务未启用");
             throw new LlmException(LlmErrorType.CONFIGURATION_ERROR, "LLM 服务未启用");
         }
 
-        return chatCompletionWithRetry(messages);
+        return doChatCompletion(messages);
     }
 
-    private String chatCompletionWithRetry(List<ChatMessage> messages) {
-        int attempt = 0;
-        
-        while (true) {
-            try {
-                return doChatCompletion(messages);
-            } catch (LlmException e) {
-                if (!retryStrategy.shouldRetry(attempt, e)) {
-                    log.error("LLM 请求失败，已达最大重试次数或错误不可重试: {}", e.getMessage());
-                    throw e;
-                }
-                
-                attempt++;
-                log.warn("LLM 请求失败 (尝试 {}/{}): {} - 将进行重试", 
-                        attempt, retryStrategy.getMaxAttempts(), e.getMessage());
-                
-                try {
-                    retryStrategy.backoff(attempt - 1);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new LlmException(
-                            LlmErrorType.UNKNOWN_ERROR,
-                            "重试等待被中断",
-                            ie
-                    );
-                }
-            }
-        }
+    private String chatCompletionFallback(List<ChatMessage> messages, Throwable cause) {
+        log.warn("LLM API chatCompletion 断路器触发。原因: {}", cause.getMessage());
+        throw new LlmException(
+                LlmErrorType.SERVICE_UNAVAILABLE,
+                "LLM 服务暂时不可用，请稍后重试",
+                cause
+        );
     }
 
     private String doChatCompletion(List<ChatMessage> messages) {

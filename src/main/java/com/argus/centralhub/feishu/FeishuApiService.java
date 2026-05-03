@@ -1,5 +1,6 @@
 package com.argus.centralhub.feishu;
 
+import com.argus.centralhub.circuitbreaker.annotation.CircuitBreakerProtect;
 import com.argus.centralhub.config.FeishuBotProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,6 +62,12 @@ public class FeishuApiService {
         }
     }
 
+    @CircuitBreakerProtect(
+            name = "feishu-api-refreshToken",
+            timeoutMs = 10000,
+            maxRetries = 2,
+            fallbackMethod = "refreshTokenFallback"
+    )
     private String refreshAccessToken() {
         try {
             Map<String, String> requestBody = new HashMap<>();
@@ -96,6 +103,21 @@ public class FeishuApiService {
         }
     }
 
+    private String refreshTokenFallback(Throwable cause) {
+        log.warn("飞书 API refreshToken 断路器触发，尝试使用缓存的 token。原因: {}", cause.getMessage());
+        if (cachedAccessToken != null) {
+            log.warn("使用缓存的 access_token（可能已过期）");
+            return cachedAccessToken;
+        }
+        throw new RuntimeException("飞书 Token 服务不可用，且无缓存可用", cause);
+    }
+
+    @CircuitBreakerProtect(
+            name = "feishu-api-sendMessage",
+            timeoutMs = 10000,
+            maxRetries = 2,
+            fallbackMethod = "sendMessageFallback"
+    )
     public boolean sendTextMessage(String receiveIdType, String receiveId, String text) {
         try {
             ObjectNode content = objectMapper.createObjectNode();
@@ -108,6 +130,12 @@ public class FeishuApiService {
         }
     }
 
+    @CircuitBreakerProtect(
+            name = "feishu-api-sendMessage",
+            timeoutMs = 10000,
+            maxRetries = 2,
+            fallbackMethod = "sendMessageFallback"
+    )
     public boolean sendCardMessage(String receiveIdType, String receiveId, ObjectNode cardContent) {
         try {
             return sendMessage(receiveIdType, receiveId, "interactive", cardContent.toString());
@@ -117,6 +145,17 @@ public class FeishuApiService {
         }
     }
 
+    private boolean sendMessageFallback(String receiveIdType, String receiveId, Object content, Throwable cause) {
+        log.warn("飞书 API sendMessage 断路器触发，消息发送失败。接收者: {}, 原因: {}", receiveId, cause.getMessage());
+        return false;
+    }
+
+    @CircuitBreakerProtect(
+            name = "feishu-api-replyMessage",
+            timeoutMs = 10000,
+            maxRetries = 2,
+            fallbackMethod = "replyMessageFallback"
+    )
     public boolean replyTextMessage(String messageId, String text) {
         try {
             ObjectNode content = objectMapper.createObjectNode();
@@ -129,6 +168,12 @@ public class FeishuApiService {
         }
     }
 
+    @CircuitBreakerProtect(
+            name = "feishu-api-replyMessage",
+            timeoutMs = 10000,
+            maxRetries = 2,
+            fallbackMethod = "replyMessageFallback"
+    )
     public boolean replyCardMessage(String messageId, ObjectNode cardContent) {
         try {
             return replyMessage(messageId, "interactive", cardContent.toString());
@@ -136,6 +181,11 @@ public class FeishuApiService {
             log.error("回复卡片消息失败", e);
             return false;
         }
+    }
+
+    private boolean replyMessageFallback(String messageId, Object content, Throwable cause) {
+        log.warn("飞书 API replyMessage 断路器触发，消息回复失败。消息ID: {}, 原因: {}", messageId, cause.getMessage());
+        return false;
     }
 
     private boolean sendMessage(String receiveIdType, String receiveId, String msgType, String content) {
@@ -209,6 +259,12 @@ public class FeishuApiService {
         }
     }
 
+    @CircuitBreakerProtect(
+            name = "feishu-api-updateCard",
+            timeoutMs = 10000,
+            maxRetries = 2,
+            fallbackMethod = "updateCardFallback"
+    )
     public boolean updateCard(String token, ObjectNode cardContent) {
         try {
             ObjectNode requestBody = objectMapper.createObjectNode();
@@ -240,5 +296,10 @@ public class FeishuApiService {
             log.error("调用飞书更新卡片 API 失败", e);
             return false;
         }
+    }
+
+    private boolean updateCardFallback(String token, ObjectNode cardContent, Throwable cause) {
+        log.warn("飞书 API updateCard 断路器触发，卡片更新失败。token: {}, 原因: {}", token, cause.getMessage());
+        return false;
     }
 }

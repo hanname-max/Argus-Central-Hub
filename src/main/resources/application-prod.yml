@@ -1,0 +1,278 @@
+server:
+  port: ${SERVER_PORT:8080}
+  threads:
+    virtual:
+      enabled: true
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    accept-count: 100
+    max-connections: 10000
+    connection-timeout: 20000
+    keep-alive-timeout: 60000
+    max-http-form-post-size: 2MB
+    max-swallow-size: 2MB
+
+spring:
+  application:
+    name: argus-central-hub
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:argus_central_hub}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true&useLocalSessionState=true&rewriteBatchedStatements=true&cacheResultSetMetadata=true&cacheServerConfiguration=true&elideSetAutoCommits=true&maintainTimeStats=false
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 600000
+      connection-timeout: 30000
+      validation-timeout: 5000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      pool-name: ArgusHikariCP
+      register-mbeans: false
+      initialization-fail-timeout: 1
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+
+  jpa:
+    hibernate:
+      ddl-auto: ${DDL_AUTO:none}
+    show-sql: ${SHOW_SQL:false}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+        jdbc:
+          batch_size: 20
+          order_inserts: true
+          order_updates: true
+          batch_versioned_data: true
+        generate_statistics: false
+        use_identifier_rollback: true
+        connection:
+          provider_disables_autocommit: true
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 10000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+        shutdown-timeout: 100ms
+
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: ${MAIL_PROTOCOL:smtp}
+    default-encoding: UTF-8
+    to: ${MAIL_TO:}
+    smtp:
+      auth: true
+      start-tls-enable: true
+      ssl-enable: false
+      ssl-trust: ${MAIL_HOST:smtp.qq.com}
+
+  task:
+    execution:
+      pool:
+        core-size: 2
+        max-size: 4
+        queue-capacity: 100
+        keep-alive: 60s
+      thread-name-prefix: task-executor-
+    scheduling:
+      pool:
+        size: 2
+      thread-name-prefix: scheduler-
+
+logging:
+  level:
+    com.argus.centralhub: ${LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${HIBERNATE_LOG_LEVEL:WARN}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${HIBERNATE_LOG_LEVEL:WARN}
+    org.springframework: WARN
+    io.github.resilience4j: INFO
+    com.zaxxer.hikari: INFO
+    org.redisson: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+  file:
+    name: logs/argus-central-hub.log
+    max-size: 50MB
+    max-history: 30
+    total-size-cap: 1GB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: ${RESILIENCE4J_FAILURE_RATE_THRESHOLD:50}
+        slow-call-rate-threshold: ${RESILIENCE4J_SLOW_CALL_RATE_THRESHOLD:100}
+        slow-call-duration-threshold: ${RESILIENCE4J_SLOW_CALL_DURATION_THRESHOLD:5s}
+        wait-duration-in-open-state: ${RESILIENCE4J_WAIT_DURATION_IN_OPEN_STATE:30s}
+        permitted-number-of-calls-in-half-open-state: ${RESILIENCE4J_PERMITTED_CALLS_IN_HALF_OPEN:3}
+        sliding-window-size: ${RESILIENCE4J_SLIDING_WINDOW_SIZE:10}
+        minimum-number-of-calls: ${RESILIENCE4J_MINIMUM_CALLS:5}
+        sliding-window-type: COUNT_BASED
+        automatic-transition-from-open-to-half-open: true
+        record-exceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - java.io.IOException
+          - org.springframework.web.client.ResourceAccessException
+    instances:
+      cloud-api:
+        base-config: default
+        failure-rate-threshold: 40
+        wait-duration-in-open-state: 20s
+      docker-api:
+        base-config: default
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 15s
+        slow-call-duration-threshold: 10s
+      feishu-api:
+        base-config: default
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+      llm-api:
+        base-config: default
+        failure-rate-threshold: 30
+        wait-duration-in-open-state: 60s
+        slow-call-duration-threshold: 30s
+
+  retry:
+    configs:
+      default:
+        max-attempts: ${RESILIENCE4J_RETRY_MAX_ATTEMPTS:3}
+        wait-duration: ${RESILIENCE4J_RETRY_WAIT_DURATION:1s}
+        retry-exceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - java.io.IOException
+          - org.springframework.web.client.ResourceAccessException
+    instances:
+      cloud-api:
+        max-attempts: 3
+        wait-duration: 500ms
+      docker-api:
+        max-attempts: 2
+        wait-duration: 1s
+      feishu-api:
+        max-attempts: 2
+        wait-duration: 2s
+      llm-api:
+        max-attempts: 3
+        wait-duration: 1s
+
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: ${RESILIENCE4J_TIMEOUT_DURATION:30s}
+        cancel-running-future: true
+    instances:
+      cloud-api:
+        timeout-duration: 15s
+      docker-api:
+        timeout-duration: 30s
+      feishu-api:
+        timeout-duration: 10s
+      llm-api:
+        timeout-duration: 60s
+
+cloud:
+  provider:
+    third-party:
+      - code: ${THIRD_PARTY_CLOUD_CODE:CUSTOM_CLOUD}
+        label: ${THIRD_PARTY_CLOUD_LABEL:自定义云厂商}
+        api-endpoint: ${THIRD_PARTY_CLOUD_API_ENDPOINT:https://api.custom-cloud.com}
+        auth-type: ${THIRD_PARTY_CLOUD_AUTH_TYPE:API_KEY}
+        access-key: ${THIRD_PARTY_CLOUD_ACCESS_KEY:}
+        secret-key: ${THIRD_PARTY_CLOUD_SECRET_KEY:}
+        region: ${THIRD_PARTY_CLOUD_REGION:cn-east-1}
+
+cache:
+  ttl-minutes: 5
+  local-cache:
+    enabled: true
+  distributed:
+    enabled: true
+
+rate-limit:
+  local:
+    enabled: true
+    limit: 100
+    window-seconds: 60
+  distributed:
+    enabled: true
+    limit: 500
+    window-seconds: 60
+  max-wait-retries: 3
+  retry-interval-ms: 500
+
+scheduler:
+  instance-sync:
+    enabled: ${INSTANCE_SYNC_ENABLED:true}
+    cron: ${INSTANCE_SYNC_CRON:0 */5 * * * ?}
+    default-region: ${INSTANCE_SYNC_DEFAULT_REGION:cn-east-1}
+
+shutdown-rule:
+  enabled: ${SHUTDOWN_RULE_ENABLED:false}
+  cron: ${SHUTDOWN_RULE_CRON:0 0 * * * ?}
+
+feishu:
+  bot:
+    app-id: ${FEISHU_APP_ID:}
+    app-secret: ${FEISHU_APP_SECRET:}
+    verification-token: ${FEISHU_VERIFICATION_TOKEN:}
+    encrypt-key: ${FEISHU_ENCRYPT_KEY:}
+    tenant-key: ${FEISHU_TENANT_KEY:}
+
+llm:
+  enabled: ${LLM_ENABLED:false}
+  api-key: ${LLM_API_KEY:}
+
+webhook:
+  enabled: ${WEBHOOK_ENABLED:true}
+  secret: ${WEBHOOK_SECRET:your-secret-key-here}
+  registry-auths:
+    - image-prefix: ${WEBHOOK_REGISTRY_PREFIX:}
+      username: ${WEBHOOK_REGISTRY_USERNAME:}
+      password: ${WEBHOOK_REGISTRY_PASSWORD:}
+
+docker:
+  nodes:
+    - name: ${DOCKER_NODE1_NAME:node1}
+      host: ${DOCKER_NODE1_HOST:localhost}
+      port: ${DOCKER_NODE1_PORT:2375}
+      tls-enabled: ${DOCKER_NODE1_TLS_ENABLED:false}

@@ -1,0 +1,190 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: argus_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-${DB_PASSWORD}}
+      MYSQL_DATABASE: ${DB_NAME:argus_central_hub}
+      MYSQL_USER: ${DB_USERNAME:argus}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${DB_PORT:3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+      --max_connections=100
+      --innodb_buffer_pool_size=256M
+      --innodb_log_file_size=64M
+      --innodb_flush_log_at_trx_commit=2
+      --sync_binlog=0
+      --query_cache_type=0
+      --query_cache_size=0
+      --tmp_table_size=16M
+      --max_heap_table_size=16M
+      --thread_cache_size=8
+      --table_open_cache=400
+      --open_files_limit=1000
+      --performance_schema=OFF
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${DB_USERNAME:argus}", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - argus_network
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    container_name: argus_redis
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${REDIS_PORT:6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --tcp-keepalive 60
+      --timeout 300
+      --databases 16
+      --maxclients 1000
+      --hz 10
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - argus_network
+    security_opt:
+      - no-new-privileges:true
+
+  argus-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: argus-central-hub:latest
+    container_name: argus_app
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      SERVER_PORT: ${SERVER_PORT:8080}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:argus_central_hub}
+      DB_USERNAME: ${DB_USERNAME:argus}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:}
+      REDIS_DATABASE: ${REDIS_DATABASE:0}
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_OPTS: >
+        -XX:+UseZGC
+        -XX:+ZGenerational
+        -XX:MaxRAMPercentage=75.0
+        -XX:InitialRAMPercentage=50.0
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp
+        -XX:+ParallelRefProcEnabled
+        -XX:ParallelGCThreads=2
+        -XX:ConcGCThreads=1
+        -XX:ZCollectionIntervalMinutes=15
+        -XX:+ExplicitGCInvokesConcurrent
+        -XX:+UseStringDeduplication
+        -XX:+OptimizeStringConcat
+        -XX:+EliminateAllocations
+        -XX:+UseCompressedOops
+        -XX:+UseCompressedClassPointers
+        -XX:+TieredCompilation
+        -XX:+AlwaysPreTouch
+        -Djava.security.egd=file:/dev/./urandom
+        -Djava.util.concurrent.ForkJoinPool.common.parallelism=2
+        -Dspring.threads.virtual.enabled=true
+    ports:
+      - "${SERVER_PORT:8080}:8080"
+    volumes:
+      - app_logs:/app/logs
+      - /tmp:/tmp
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 768M
+        reservations:
+          cpus: '0.5'
+          memory: 384M
+    networks:
+      - argus_network
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_logs:
+    driver: local
+
+networks:
+  argus_network:
+    name: argus_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

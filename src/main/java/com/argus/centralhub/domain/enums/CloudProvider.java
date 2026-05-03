@@ -11,6 +11,7 @@ public enum CloudProvider {
     VOLCENGINE("VOLCENGINE", "火山引擎"),
     JD_CLOUD("JD_CLOUD", "京东云"),
     ORACLE("ORACLE", "Oracle云"),
+    DOCKER("DOCKER", "Docker节点"),
     OTHER("OTHER", "第三方/其他");
 
     private final String code;
